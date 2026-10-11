@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SABLE // Hacker Terminal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00802b;
+    --green-dark: #003b14;
+    --bg: #0a0e0a;
+    --red: #ff3333;
+    --yellow: #ffd700;
+    --cyan: #00ffff;
+    --glow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Courier New', 'Consolas', monospace;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  #matrix {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.25;
+  }
+  
+  .crt {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.3) 100%);
+  }
+  
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 101;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.15) 0px,
+      rgba(0,0,0,0.15) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    animation: scan 8s linear infinite;
+  }
+  
+  @keyframes scan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+  }
+  
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+  }
+  
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--green-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .logo {
+    font-weight: bold;
+    font-size: 18px;
+    letter-spacing: 4px;
+    text-shadow: var(--glow);
+    animation: glitch 4s infinite;
+  }
+  
+  @keyframes glitch {
+    0%, 90%, 100% { transform: translate(0); }
+    92% { transform: translate(-2px, 1px); color: var(--red); }
+    94% { transform: translate(2px, -1px); }
+    96% { transform: translate(-1px, 2px); color: var(--cyan); }
+  }
+  
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    color: var(--green);
+    opacity: 0.85;
+    flex-wrap: wrap;
+  }
+  
+  .status-bar span { white-space: nowrap; }
+  .status-bar .live { color: var(--green); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  
+  #terminal {
+    position: relative;
+    z-index: 10;
+    height: calc(100% - 42px);
+    padding: 16px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  #terminal::-webkit-scrollbar { width: 8px; }
+  #terminal::-webkit-scrollbar-track { background: var(--green-dark); }
+  #terminal::-webkit-scrollbar-thumb { background: var(--green-dim); }
+  
+  #output > div {
+    margin-bottom: 2px;
+    word-wrap: break-word;
+    animation: fadein 0.15s ease-out;
+  }
+  
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .line-cmd { color: var(--cyan); }
+  .line-err { color: var(--red); }
+  .line-ok { color: var(--green); }
+  .line-warn { color: var(--yellow); }
+  .line-dim { color: var(--green-dim); }
+  .line-big {
+    font-size: 11px;
+    line-height: 1.1;
+    white-space: pre;
+    overflow-x: auto;
+    text-shadow: var(--glow);
+  }
+  
+  .input-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    position: relative;
+  }
+  
+  .prompt {
+    color: var(--green);
+    font-weight: bold;
+    text-shadow: var(--glow);
+  }
+  
+  #cmd {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--green);
+    font-family: inherit;
+    font-size: 14px;
+    caret-color: var(--green);
+  }
+  
+  #cmd::placeholder { color: var(--green-dark); }
+  
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 16px;
+    background: var(--green);
+    animation: blink 1s infinite;
+    box-shadow: var(--glow);
+  }
+  
+  @keyframes blink { 50% { opacity: 0; } }
+  
+  .boot-line {
+    color: var(--green-dim);
+    font-size: 12px;
+  }
+  
+  .progress {
+    display: inline-block;
+    color: var(--green);
+  }
+  
+  .bar {
+    display: inline-block;
+    width: 200px;
+    height: 10px;
+    border: 1px solid var(--green);
+    position: relative;
+    vertical-align: middle;
+    margin: 0 8px;
+  }
+  
+  .bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    animation: fill 1s linear forwards;
+    box-shadow: var(--glow);
+  }
+  
+  @keyframes fill { to { width: var(--w, 100%); } }
+  
+  .result-box {
+    border: 1px solid var(--green-dim);
+    padding: 10px;
+    margin: 6px 0;
+    background: rgba(0, 255, 65, 0.03);
+    border-left: 3px solid var(--green);
+  }
+  
+  .result-box b { color: var(--cyan); }
+  
+  .ascii-art {
+    font-size: 10px;
+    line-height: 1.05;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--green);
+    text-shadow: var(--glow);
+    margin: 4px 0;
+  }
+  
+  .blink { animation: blink 1s infinite; }
+  
+  .autocomplete {
+    position: fixed;
+    bottom: 60px;
+    left: 16px;
+    background: rgba(0,0,0,0.9);
+    border: 1px solid var(--green-dim);
+    padding: 6px 10px;
+    font-size: 12px;
+    z-index: 50;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+  }
+  
+  .autocomplete div {
+    padding: 2px 4px;
+    cursor: pointer;
+  }
+  
+  .autocomplete div:hover, .autocomplete div.sel {
+    background: var(--green-dim);
+    color: var(--bg);
+  }
+  
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--green);
+    font-size: 10px;
+    margin-right: 6px;
+    text-transform: uppercase;
+  }
+  
+  .row-flex { display: flex; gap: 10px; flex-wrap: wrap; }
+  
+  .glitch-text {
+    position: relative;
+    color: var(--green);
+    text-shadow: 2px 0 var(--red), -2px 0 var(--cyan);
+    animation: glitchtext 3s infinite;
+  }
+  
+  @keyframes glitchtext {
+    0%, 80%, 100% { transform: translate(0); }
+    82% { transform: translate(2px, -1px); }
+    84% { transform: translate(-2px, 1px); }
+    86% { transform: translate(1px, 2px); }
+  }
+  
+  @media (max-width: 600px) {
+    .ascii-art { font-size: 6px; }
+    #terminal { font-size: 12px; padding: 10px; }
+    header { font-size: 10px; padding: 6px 10px; }
+    .logo { font-size: 14px; letter-spacing: 2px; }
+    .status-bar { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+<div class="crt"></div>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<header>
+  <div class="logo">SABLE<span style="color:var(--green-dim)">.OS</span></div>
+  <div class="status-bar">
+    <span><span class="live">●</span> SECURE</span>
+    <span id="hdr-ip">IP: —</span>
+    <span id="hdr-time">--:--:--</span>
+    <span>v3.0</span>
+  </div>
+</header>
+
+<div id="terminal">
+  <div id="output"></div>
+  <div class="input-line">
+    <span class="prompt">root@sable:~#</span>
+    <input id="cmd" autocomplete="off" spellcheck="false" placeholder="type 'help'...">
+  </div>
+</div>
+
+<div class="autocomplete" id="autocomplete"></div>
+
+<script>
+// ============================================================
+// MATRIX RAIN
+// ============================================================
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+let cols, drops, fontSize = 16;
+const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
+
+function resizeMatrix() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  cols = Math.floor(canvas.width / fontSize);
+  drops = Array(cols).fill(1);
+}
+resizeMatrix();
+window.addEventListener('resize', resizeMatrix);
+
+function drawMatrix() {
+  ctx.fillStyle = "rgba(10, 14, 10, 0.06)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#00ff41";
+  ctx.font = fontSize + "px monospace";
+  for (let i = 0; i < drops.length; i++) {
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(drawMatrix, 50);
+
+// ============================================================
+// TERMINAL
+// ============================================================
+const out = document.getElementById('output');
+const cmdInput = document.getElementById('cmd');
+const terminal = document.getElementById('terminal');
+const acBox = document.getElementById('autocomplete');
+
+const history = [];
+let histIdx = -1;
+
+function print(text, cls = '') {
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  if (typeof text === 'string' && text.includes('\\n')) text = text.replace(/\\n/g, '\n');
+  div.innerHTML = text;
+  out.appendChild(div);
+  terminal.scrollTop = terminal.scrollHeight;
+  return div;
+}
+
+function println(text = '') { return print(text); }
+
+async function typeText(text, cls = '', speed = 8) {
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  out.appendChild(div);
+  for (let i = 0; i < text.length; i++) {
+    div.textContent += text[i];
+    terminal.scrollTop = terminal.scrollHeight;
+    if (text[i] === '\n') await new Promise(r => setTimeout(r, 30));
+    else await new Promise(r => setTimeout(r, speed));
+  }
+  return div;
+}
+
+async function progressBar(label, duration = 1000) {
+  const div = document.createElement('div');
+  div.className = 'line-ok';
+  out.appendChild(div);
+  const start = Date.now();
+  return new Promise(resolve => {
+    const iv = setInterval(() => {
+      const p = Math.min(1, (Date.now() - start) / duration);
+      const pct = Math.floor(p * 100);
+      const filled = Math.floor(p * 20);
+      const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
+      div.textContent = `${label} [${bar}] ${pct}%`;
+      terminal.scrollTop = terminal.scrollHeight;
+      if (p >= 1) {
+        clearInterval(iv);
+        resolve();
+      }
+    }, 40);
+  });
+}
+
+function clearTerm() { out.innerHTML = ''; }
+
+// ============================================================
+// ASCII BANNER
+// ============================================================
+const BANNER = `
+ ███████╗ █████╗ ██████╗ ██╗     ███████╗
+ ██╔════╝██╔══██╗██╔══██╗██║     ██╔════╝
+ ███████╗███████║██████╔╝██║     █████╗  
+ ╚════██║██╔══██║██╔══██╗██║     ██╔══╝  
+ ███████║██║  ██║██████╔╝███████╗███████╗
+ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════╝
+                    [ S A B L E . O S  v3.0 ]
+`;
+
+// ============================================================
+// MD5 (mini implementation)
+// ============================================================
+function md5(input) {
+  function rl(n, c) { return (n << c) | (n >>> (32 - c)); }
+  function au(x, y) { const l = (x & 0xFFFF) + (y & 0xFFFF); return (((x >> 16) + (y >> 16) + (l >> 16)) << 16) | (l & 0xFFFF); }
+  function cmn(q, a, b, x, s, t) { return au(rl(au(au(a, q), au(x, t)), s), b); }
+  function ff(a, b, c, d, x, s, t) { return cmn((b & c) | (~b & d), a, b, x, s, t); }
+  function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & ~d), a, b, x, s, t); }
+  function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+  function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | ~d), a, b, x, s, t); }
+  function sb(s) {
+    const utf = unescape(encodeURIComponent(s));
+    const len = utf.length;
+    const nblk = ((len + 8) >> 6) + 1;
+    const blks = new Array(nblk * 16).fill(0);
+    for (let i = 0; i < len; i++) blks[i >> 2] |= utf.charCodeAt(i) << ((i % 4) * 8);
+    blks[len >> 2] |= 0x80 << ((len % 4) * 8);
+    blks[nblk * 16 - 2] = len * 8;
+    return blks;
+  }
+  function hex(n) { let s = ""; for (let i = 0; i < 4; i++) s += ((n >> (i * 8 + 4)) & 0x0F).toString(16) + ((n >> (i * 8)) & 0x0F).toString(16); return s; }
+  const x = sb(input);
+  let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+  for (let i = 0; i < x.length; i += 16) {
+    const oa = a, ob = b, oc = c, od = d;
+    a = ff(a, b, c, d, x[i], 7, -680876936);   d = ff(d, a, b, c, x[i+1], 12, -389564586);
+    c = ff(c, d, a, b, x[i+2], 17, 606105819);  b = ff(b, c, d, a, x[i+3], 22, -1044525330);
+    a = ff(a, b, c, d, x[i+4], 7, -176418897);  d = ff(d, a, b, c, x[i+5], 12, 1200080426);
+    c = ff(c, d, a, b, x[i+6], 17, -1473231341);b = ff(b, c, d, a, x[i+7], 22, -45705983);
+    a = ff(a, b, c, d, x[i+8], 7, 1770035416);  d = ff(d, a, b, c, x[i+9], 12, -1958414417);
+    c = ff(c, d, a, b, x[i+10],17,-42063);      b = ff(b, c, d, a, x[i+11],22,-1990404162);
+    a = ff(a, b, c, d, x[i+12],7, 1804603682);  d = ff(d, a, b, c, x[i+13],12,-40341101);
+    c = ff(c, d, a, b, x[i+14],17,-1502002290); b = ff(b, c, d, a, x[i+15],22,1236535329);
+    a = gg(a, b, c, d, x[i+1], 5, -165796510);  d = gg(d, a, b, c, x[i+6], 9, -1069501632);
+    c = gg(c, d, a, b, x[i+11],14,643717713);   b = gg(b, c, d, a, x[i], 20, -373897302);
+    a = gg(a, b, c, d, x[i+5], 5, -701558691);  d = gg(d, a, b, c, x[i+10],9, 38016083);
+    c = gg(c, d, a, b, x[i+15],14,-660478335);  b = gg(b, c, d, a, x[i+4], 20,-405537848);
+    a = gg(a, b, c, d, x[i+9], 5, 568446438);   d = gg(d, a, b, c, x[i+14],9, -1019803690);
+    c = gg(c, d, a, b, x[i+3], 14,-187363961);  b = gg(b, c, d, a, x[i+8], 20,1163531501);
+    a = gg(a, b, c, d, x[i+13],5, -1444681467); d = gg(d, a, b, c, x[i+2], 9, -51403784);
+    c = gg(c, d, a, b, x[i+7], 14,1735328473);  b = gg(b, c, d, a, x[i+12],20,-1926607734);
+    a = hh(a, b, c, d, x[i+5], 4, -378558);     d = hh(d, a, b, c, x[i+8], 11,-2022574463);
+    c = hh(c, d, a, b, x[i+11],16,1839030562);  b = hh(b, c, d, a, x[i+14],23,-35309556);
+    a = hh(a, b, c, d, x[i+1], 4, -1530992060); d = hh(d, a, b, c, x[i+4], 11,1272893353);
+    c = hh(c, d, a, b, x[i+7], 16,-155497632);  b = hh(b, c, d, a, x[i+10],23,-1094730640);
+    a = hh(a, b, c, d, x[i+13],4, 681279174);   d = hh(d, a, b, c, x[i], 11,-358537222);
+    c = hh(c, d, a, b, x[i+3], 16,-722521979);  b = hh(b, c, d, a, x[i+6], 23,76029189);
+    a = hh(a, b, c, d, x[i+9], 4, -640364487);  d = hh(d, a, b, c, x[i+12],11,-421815835);
+    c = hh(c, d, a, b, x[i+15],16,530742520);   b = hh(b, c, d, a, x[i+2], 23,-995338651);
+    a = ii(a, b, c, d, x[i], 6, -198630844);    d = ii(d, a, b, c, x[i+7], 10,1126891415);
+    c = ii(c, d, a, b, x[i+14],15,-1416354905); b = ii(b, c, d, a, x[i+5], 21,-57434055);
+    a = ii(a, b, c, d, x[i+12],6, 1700485571);  d = ii(d, a, b, c, x[i+3], 10,-1894986606);
+    c = ii(c, d, a, b, x[i+10],15,-1051523);    b = ii(b, c, d, a, x[i+1], 21,-2054922799);
+    a = ii(a, b, c, d, x[i+8], 6, 1873313359);  d = ii(d, a, b, c, x[i+15],10,-30611744);
+    c = ii(c, d, a, b, x[i+6], 15,-1560198380); b = ii(b, c, d, a, x[i+13],21,1309151649);
+    a = ii(a, b, c, d, x[i+4], 6, -145523070);  d = ii(d, a, b, c, x[i+11],10,-1120210379);
+    c = ii(c, d, a, b, x[i+2], 15,718787259);   b = ii(b, c, d, a, x[i+9], 21,-343485551);
+    a = au(a, oa); b = au(b, ob); c = au(c, oc); d = au(d, od);
+  }
+  return hex(a) + hex(b) + hex(c) + hex(d);
+}
+
+// ============================================================
+// CRYPTO HELPERS
+// ============================================================
+async function sha(algo, text) {
+  const buf = await crypto.subtle.digest(algo, new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function b64e(t) { return btoa(unescape(encodeURIComponent(t))); }
+function b64d(t) { return decodeURIComponent(escape(atob(t))); }
+function hexe(t) { return [...new TextEncoder().encode(t)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function hexd(t) { return new TextDecoder().decode(new Uint8Array(t.match(/.{1,2}/g).map(h => parseInt(h, 16)))); }
+
+// ============================================================
+// COMMANDS
+// ============================================================
+const COMMANDS = {
+
+  async help() {
+    print('<div class="line-big">' + BANNER + '</div>');
+    print('<span class="badge">SYSTEM</span> <b>root@sable</b> — available commands:');
+    println();
+    const groups = [
+      ['🛠 SYSTEM', ['help', 'about', 'clear', 'banner', 'sys', 'date', 'whoami', 'sound', 'matrix', 'theme']],
+      ['🌐 NETWORK', ['ip <addr>', 'myip', 'dns <domain>', 'trace <host>', 'ping <host>', 'headers <url>']],
+      ['🔐 CRYPTO', ['hash <text>', 'md5 <text>', 'sha256 <text>', 'b64e <text>', 'b64d <text>', 'hexe <text>', 'hexd <text>', 'jwt <token>']],
+      ['⚙️ TOOLS', ['uuid', 'pass [len]', 'qr <text>', 'reverse <text>', 'upper <text>', 'lower <text>', 'count <text>', 'binary <text>', 'caesar <shift> <text>', 'shorten <url>']],
+      ['🎭 FUN', ['hack <name>', 'matrix-mode', 'crack <hash>', 'whoami', 'sudo']],
+    ];
+    groups.forEach(([title, cmds]) => {
+      println(`<span class="line-warn">${title}</span>`);
+      cmds.forEach(c => println(`  <span class="line-ok">${c}</span>`));
+      println();
+    });
+    print('<span class="line-dim">Tip: ↑/↓ = history, Tab = autocomplete</span>');
+  },
+
+  async about() {
+    print('<span class="glitch-text">SABLE.OS v3.0</span>');
+    println();
+    print('<div class="result-box">');
+    print('<b>SABLE</b> — hacker toolkit terminal');
+    print('Built with <b>pure JavaScript</b> — no backend, no API keys needed.');
+    print('All crypto runs <b>client-side</b> using WebCrypto API.');
+    print('Network tools use public free APIs (ip-api, dns.google).');
+    println();
+    print('<span class="line-dim">"Soft to the touch. Lethal to the bone."</span>');
+    print('</div>');
+  },
+
+  async banner() {
+    print('<div class="line-big">' + BANNER + '</div>');
+  },
+
+  async clear() { clearTerm(); },
+
+  async sys() {
+    const nav = navigator;
+    const info = [
+      ['OS', nav.platform || 'unknown'],
+      ['Cores', nav.hardwareConcurrency || '?'],
+      ['Memory', nav.deviceMemory ? nav.deviceMemory + ' GB' : 'unknown'],
+      ['Language', nav.language],
+      ['Screen', `${screen.width}x${screen.height}`],
+      ['Viewport', `${window.innerWidth}x${window.innerHeight}`],
+      ['Pixel Ratio', window.devicePixelRatio],
+      ['Timezone', Intl.DateTimeFormat().resolvedOptions().timeZone],
+      ['User Agent', nav.userAgent.slice(0, 80)],
+      ['Online', nav.onLine ? '🟢 yes' : '🔴 no'],
+      ['Cookies', nav.cookieEnabled ? 'enabled' : 'disabled'],
+    ];
+    print('<div class="result-box">');
+    print('<b>⚙ SYSTEM INFO</b>');
+    info.forEach(([k, v]) => print(`  <b>${k}:</b> ${v}`));
+    print('</div>');
+  },
+
+  async date() {
+    print(new Date().toString());
+    print(`<span class="line-dim">UTC: ${new Date().toUTCString()}</span>`);
+  },
+
+  async whoami() {
+    print(`<b>root@sable</b>`);
+    print('<span class="line-dim">user: root | group: wheel, sudo | shell: /bin/sable</span>');
+  },
+
+  async sudo() {
+    print('<span class="line-err">sudo: permission granted — you ARE root, baby. 😎</span>');
+  },
+
+  // ================= NETWORK =================
+  async ip(args) {
+    if (!args[0]) return print('<span class="line-err">usage: ip &lt;address&gt;</span>');
+    const ip = args[0];
+    await progressBar('resolving', 500);
+    try {
+      const r = await fetch(`http://ip-api.com/json/${ip}`).then(r => r.json());
+      if (r.status !== 'success') return print('<span class="line-err">lookup failed</span>');
+      const rows = [
+        ['Country', `${r.country} (${r.countryCode})`],
+        ['Region', r.regionName],
+        ['City', r.city],
+        ['ZIP', r.zip || '—'],
+        ['Lat/Lon', `${r.lat}, ${r.lon}`],
+        ['Timezone', r.timezone],
+        ['ISP', r.isp],
+        ['Org', r.org],
+        ['AS', r.as],
+        ['Mobile', r.mobile ? 'yes' : 'no'],
+        ['Proxy', r.proxy ? 'yes' : 'no'],
+      ];
+      print('<div class="result-box">');
+      print(`<b>🌐 IP LOOKUP: ${ip}</b>`);
+      rows.forEach(([k, v]) => print(`  <b>${k}:</b> ${v}`));
+      print('</div>');
+    } catch (e) {
+      print(`<span class="line-err">error: ${e.message}</span>`);
+    }
+  },
+
+  async myip() {
+    await progressBar('detecting public IP', 700);
+    try {
+      const r = await fetch('https://api.ipify.org?format=json').then(r => r.json());
+      print(`<b>Your IP:</b> <span class="line-ok">${r.ip}</span>`);
+      print('<span class="line-dim">Use: ip ' + r.ip + '</span>');
+    } catch (e) {
+      print('<span class="line-err">failed to detect</span>');
+    }
+  },
+
+  async dns(args) {
+    if (!args[0]) return print('<span class="line-err">usage: dns &lt;domain&gt; [type]</span>');
+    const domain = args[0];
+    const type = (args[1] || 'A').toUpperCase();
+    await progressBar('querying ' + type, 500);
+    try {
+      const r = await fetch(`https://dns.google/resolve?name=${domain}&type=${type}`).then(r => r.json());
+      print(`<div class="result-box"><b>🌐 DNS ${type}: ${domain}</b>`);
+      if (r.Answer && r.Answer.length) {
+        r.Answer.forEach(a => print(`  <b>${a.name}</b> → <span class="line-ok">${a.data}</span> (TTL ${a.TTL})`));
+      } else {
+        print('  <span class="line-warn">no records</span>');
+      }
+      print('</div>');
+    } catch (e) {
+      print(`<span class="line-err">error: ${e.message}</span>`);
+    }
+  },
+
+  async ping(args) {
+    if (!args[0]) return print('<span class="line-err">usage: ping &lt;host&gt;</span>');
+    const host = args[0].replace(/^https?:\/\//, '').split('/')[0];
+    print(`PING ${host} (browser-based, 4 packets)`);
+    for (let i = 1; i <= 4; i++) {
+      const t = performance.now();
+      try {
+        await fetch(`https://${host}/favicon.ico`, { mode: 'no-cors', cache: 'no-store' });
+        const ms = (performance.now() - t).toFixed(1);
+        print(`  64 bytes from ${host}: seq=${i} time=<span class="line-ok">${ms} ms</span>`);
+      } catch (e) {
+        print(`  <span class="line-err">seq=${i} timeout</span>`);
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    print('<span class="line-dim">--- ping statistics ---</span>');
+  },
+
+  async trace(args) {
+    if (!args[0]) return print('<span class="line-err">usage: trace &lt;host&gt;</span>');
+    const host = args[0];
+    print(`traceroute to ${host}, 30 hops max`);
+    const fakeHops = [
+      `192.168.1.1`, `10.0.0.1`, `100.64.0.1`,
+      `${Math.floor(Math.random()*200)+20}.${Math.floor(Math.random()*255)}.0.1`,
+      `${Math.floor(Math.random()*200)+20}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.1`,
+    ];
+    for (let i = 0; i < 5; i++) {
+      const ms1 = (Math.random()*30+5).toFixed(3);
+      const ms2 = (Math.random()*30+5).toFixed(3);
+      const ms3 = (Math.random()*30+5).toFixed(3);
+      print(`  ${i+1}  ${fakeHops[i]}  <span class="line-ok">${ms1} ms  ${ms2} ms  ${ms3} ms</span>`);
+      await new Promise(r => setTimeout(r, 200));
+    }
+    print('<span class="line-dim">trace complete (simulated)</span>');
+  },
+
+  async headers(args) {
+    if (!args[0]) return print('<span class="line-err">usage: headers &lt;url&gt;</span>');
+    let url = args[0];
+    if (!/^https?:\/\//.test(url)) url = 'https://' + url;
+    await progressBar('fetching headers', 700);
+    try {
+      const r = await fetch(url, { method: 'HEAD' });
+      print(`<div class="result-box"><b>📋 HEADERS: ${url}</b>`);
+      print(`  <b>Status:</b> ${r.status} ${r.statusText}`);
+      r.headers.forEach((v, k) => print(`  <b>${k}:</b> ${v}`));
+      print('</div>');
+    } catch (e) {
+      print(`<span class="line-err">CORS or network error: ${e.message}</span>`);
+      print('<span class="line-dim">Tip: many sites block cross-origin header reads.</span>');
+    }
+  },
+
+  // ================= CRYPTO =================
+  async hash(args) {
+    if (!args.length) return print('<span class="line-err">usage: hash &lt;text&gt;</span>');
+    const text = args.join(' ');
+    print(`<div class="result-box"><b>#️⃣ HASHES</b> — "${text}"`);
+    print(`  <b>MD5:</b>    <span class="line-ok">${md5(text)}</span>`);
+    print(`  <b>SHA1:</b>   <span class="line-ok">${await sha('SHA-1', text)}</span>`);
+    print(`  <b>SHA256:</b> <span class="line-ok">${await sha('SHA-256', text)}</span>`);
+    print(`  <b>SHA512:</b> <span class="line-ok">${await sha('SHA-512', text)}</span>`);
+    print('</div>');
+  },
+
+  async md5(args) {
+    if (!args.length) return print('<span class="line-err">usage: md5 &lt;text&gt;</span>');
+    print(`<b>MD5:</b> <span class="line-ok">${md5(args.join(' '))}</span>`);
+  },
+
+  async sha256(args) {
+    if (!args.length) return print('<span class="line-err">usage: sha256 &lt;text&gt;</span>');
+    print(`<b>SHA256:</b> <span class="line-ok">${await sha('SHA-256', args.join(' '))}</span>`);
+  },
+
+  async b64e(args) {
+    if (!args.length) return print('<span class="line-err">usage: b64e &lt;text&gt;</span>');
+    print(`<b>Base64:</b> <span class="line-ok">${b64e(args.join(' '))}</span>`);
+  },
+
+  async b64d(args) {
+    if (!args.length) return print('<span class="line-err">usage: b64d &lt;b64&gt;</span>');
+    try { print(`<b>Decoded:</b> <span class="line-ok">${b64d(args.join(' '))}</span>`); }
+    catch { print('<span class="line-err">invalid base64</span>'); }
+  },
+
+  async hexe(args) {
+    if (!args.length) return print('<span class="line-err">usage: hexe &lt;text&gt;</span>');
+    print(`<b>Hex:</b> <span class="line-ok">${hexe(args.join(' '))}</span>`);
+  },
+
+  async hexd(args) {
+    if (!args.length) return print('<span class="line-err">usage: hexd &lt;hex&gt;</span>');
+    try { print(`<b>Decoded:</b> <span class="line-ok">${hexd(args.join(''))}</span>`); }
+    catch { print('<span class="line-err">invalid hex</span>'); }
+  },
+
+  async jwt(args) {
+    if (!args.length) return print('<span class="line-err">usage: jwt &lt;token&gt;</span>');
+    const parts = args[0].split('.');
+    if (parts.length !== 3) return print('<span class="line-err">invalid JWT</span>');
+    try {
+      const dec = p => {
+        p = p.replace(/-/g, '+').replace(/_/g, '/');
+        p += '='.repeat((4 - p.length % 4) % 4);
+        return JSON.stringify(JSON.parse(atob(p)), null, 2);
+      };
+      print('<div class="result-box"><b>🔑 JWT DECODED</b>');
+      print(`<b>Header:</b><br>${dec(parts[0]).replace(/\n/g, '<br>')}`);
+      print(`<br><b>Payload:</b><br>${dec(parts[1]).replace(/\n/g, '<br>')}`);
+      print(`<br><b>Signature:</b> <span class="line-dim">${parts[2].slice(0, 40)}...</span>`);
+      print('</div>');
+    } catch { print('<span class="line-err">failed to decode JWT</span>'); }
+  },
+
+  // ================= TOOLS =================
+  async uuid() {
+    print(`<b>UUID v4:</b> <span class="line-ok">${crypto.randomUUID()}</span>`);
+  },
+
+  async pass(args) {
+    const len = Math.min(128, Math.max(8, parseInt(args[0]) || 20));
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+    const arr = new Uint32Array(len);
+    crypto.getRandomValues(arr);
+    const pwd = [...arr].map(n => chars[n % chars.length]).join('');
+    print(`<b>🔐 Password (${len}):</b>`);
+    print(`<span class="line-ok">${pwd}</span>`);
+  },
+
+  async qr(args) {
+    if (!args.length) return print('<span class="line-err">usage: qr &lt;text&gt;</span>');
+    const text = args.join(' ');
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
+    print(`<b>QR Code:</b> <a href="${url}" target="_blank">open</a>`);
+    print(`<img src="${url}" style="margin-top:8px;border:2px solid var(--green);image-rendering:pixelated;width:200px;height:200px;">`);
+  },
+
+  async reverse(args) {
+    if (!args.length) return print('<span class="line-err">usage: reverse &lt;text&gt;</span>');
+    print(`<span class="line-ok">${[...args.join(' ')].reverse().join('')}</span>`);
+  },
+
+  async upper(args) {
+    print(`<span class="line-ok">${args.join(' ').toUpperCase()}</span>`);
+  },
+
+  async lower(args) {
+    print(`<span class="line-ok">${args.join(' ').toLowerCase()}</span>`);
+  },
+
+  async count(args) {
+    const t = args.join(' ');
+    const words = t.trim() ? t.trim().split(/\s+/).length : 0;
+    print(`<b>Chars:</b> ${t.length} | <b>Words:</b> ${words} | <b>Lines:</b> ${t.split('\n').length}`);
+  },
+
+  async binary(args) {
+    if (!args.length) return print('<span class="line-err">usage: binary &lt;text&gt;</span>');
+    const bin = [...args.join(' ')].map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+    print(`<span class="line-ok">${bin}</span>`);
+  },
+
+  async caesar(args) {
+    const shift = parseInt(args[0]);
+    if (isNaN(shift)) return print('<span class="line-err">usage: caesar &lt;shift&gt; &lt;text&gt;</span>');
+    const text = args.slice(1).join(' ');
+    const out = text.replace(/[a-z]/gi, c => {
+      const base = c <= 'Z' ? 65 : 97;
+      return String.fromCharCode((c.charCodeAt(0) - base + shift + 26) % 26 + base);
+    });
+    print(`<span class="line-ok">${out}</span>`);
+  },
+
+  async shorten(args) {
+    if (!args[0]) return print('<span class="line-err">usage: shorten &lt;url&gt;</span>');
+    try {
+      const r = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(args[0])}`).then(r => r.json());
+      if (r.shorturl) print(`<b>🔗 Short:</b> <a href="${r.shorturl}" target="_blank">${r.shorturl}</a>`);
+      else print(`<span class="line-err">failed</span>`);
+    } catch { print('<span class="line-err">network error</span>'); }
+  },
+
+  // ================= FUN =================
+  async hack(args) {
+    const target = args.join(' ') || 'target';
+    print(`<span class="line-warn">[ INITIATING HACK SEQUENCE → ${target} ]</span>`);
+    const steps = [
+      ['Bypassing firewall', 900],
+      ['Injecting SQL payload', 700],
+      ['Cracking RSA-2048', 1200],
+      ['Escalating privileges', 800],
+      ['Downloading /etc/passwd', 600],
+      ['Covering tracks', 500],
+    ];
+    for (const [label, dur] of steps) {
+      await progressBar(label, dur);
+    }
+    print(`<span class="line-ok">[ ACCESS GRANTED ] — just kidding 😂 this is theatre, baby.</span>`);
+  },
+
+  async crack(args) {
+    if (!args[0]) return print('<span class="line-err">usage: crack &lt;hash&gt;</span>');
+    const hash = args[0].toLowerCase();
+    const dict = ['password', '123456', 'admin', 'letmein', 'qwerty', 'sable', 'root', 'love', 'hello', 'monkey', 'dragon', 'iloveyou', 'welcome', 'secret', '12345678'];
+    await progressBar('loading rainbow table', 500);
+    await progressBar('testing candidates', 1200);
+    let found = null;
+    for (const w of dict) {
+      if (md5(w) === hash) { found = w; break; }
+    }
+    if (found) print(`<span class="line-ok">✅ CRACKED: ${found}</span>`);
+    else print('<span class="line-warn">❌ not in dictionary. hash = ' + hash.slice(0, 24) + '...</span>');
+  },
+
+  async sound(args) {
+    if (args[0] === 'off') { SOUND.enabled = false; print('sound <span class="line-err">off</span>'); }
+    else if (args[0] === 'on') { SOUND.enabled = true; print('sound <span class="line-ok">on</span>'); }
+    else print(`sound: <b>${SOUND.enabled ? 'on' : 'off'}</b>`);
+  },
+
+  async matrix(args) {
+    const c = document.getElementById('matrix');
+    if (args[0] === 'off') { c.style.display = 'none'; print('matrix <span class="line-err">off</span>'); }
+    else if (args[0] === 'on') { c.style.display = 'block'; print('matrix <span class="line-ok">on</span>'); }
+    else print(`matrix: <b>${c.style.display === 'none' ? 'off' : 'on'}</b>`);
+  },
+
+  async theme(args) {
+    const colors = {
+      green: '#00ff41', red: '#ff3333', blue: '#00aaff',
+      purple: '#bb00ff', pink: '#ff00aa', orange: '#ff8800', white: '#ffffff'
+    };
+    const c = args[0];
+    if (!colors[c]) return print(`themes: ${Object.keys(colors).join(', ')}`);
+    document.documentElement.style.setProperty('--green', colors[c]);
+    print(`theme → <span style="color:${colors[c]}">${c}</span>`);
+  },
+};
+
+// ============================================================
+// SOUND ENGINE
+// ============================================================
+const SOUND = { enabled: true, ctx: null };
+function beep(freq = 440, dur = 0.05, type = 'square', vol = 0.02) {
+  if (!SOUND.enabled) return;
+  try {
+    if (!SOUND.ctx) SOUND.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = SOUND.ctx.createOscillator();
+    const g = SOUND.ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g);
+    g.connect(SOUND.ctx.destination);
+    o.start();
+    o.stop(SOUND.ctx.currentTime + dur);
+  } catch {}
+}
+
+// ============================================================
+// INPUT HANDLING
+// ============================================================
+cmdInput.addEventListener('keydown', async (e) => {
+  if (e.key === 'Enter') {
+    const raw = cmdInput.value.trim();
+    cmdInput.value = '';
+    hideAC();
+    if (!raw) return;
+    print(`<span class="line-cmd">root@sable:~# ${raw}</span>`);
+    history.push(raw);
+    histIdx = history.length;
+    beep(880, 0.03);
+    await executeCommand(raw);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx > 0) { histIdx--; cmdInput.value = history[histIdx] || ''; }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx < history.length - 1) { histIdx++; cmdInput.value = history[histIdx] || ''; }
+    else { histIdx = history.length; cmdInput.value = ''; }
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    autocomplete();
+  } else {
+    setTimeout(() => showAC(), 10);
+  }
+});
+
+async function executeCommand(raw) {
+  const parts = raw.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const args = parts.slice(1);
+  const fn = COMMANDS[cmd];
+  if (!fn) {
+    beep(200, 0.1, 'sawtooth');
+    print(`<span class="line-err">command not found: ${cmd}</span>`);
+    print('<span class="line-dim">type "help" for available commands</span>');
+    return;
+  }
+  try {
+    await fn(args);
+  } catch (e) {
+    print(`<span class="line-err">runtime error: ${e.message}</span>`);
+    console.error(e);
+  }
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+// ============================================================
+// AUTOCOMPLETE
+// ============================================================
+function showAC() {
+  const val = cmdInput.value.trim().toLowerCase();
+  if (!val) return hideAC();
+  const matches = Object.keys(COMMANDS).filter(k => k.startsWith(val.split(' ')[0]));
+  if (!matches.length) return hideAC();
+  acBox.innerHTML = '';
+  matches.slice(0, 8).forEach((m, i) => {
+    const d = document.createElement('div');
+    d.textContent = m;
+    if (i === 0) d.classList.add('sel');
+    d.onclick = () => { cmdInput.value = m + ' '; hideAC(); cmdInput.focus(); };
+    acBox.appendChild(d);
+  });
+  acBox.style.display = 'block';
+}
+function hideAC() { acBox.style.display = 'none'; }
+function autocomplete() {
+  const val = cmdInput.value.trim().toLowerCase();
+  const match = Object.keys(COMMANDS).find(k => k.startsWith(val));
+  if (match) cmdInput.value = match + ' ';
+  hideAC();
+}
+
+// ============================================================
+// BOOT SEQUENCE
+// ============================================================
+async function boot() {
+  clearTerm();
+  const bootLines = [
+    '[    0.000000] SABLE.OS v3.0 — booting kernel...',
+    '[    0.021337] CPU: WebCore x' + (navigator.hardwareConcurrency || 4) + ' @ ' + ((Math.random()*0.5+2.5).toFixed(2)) + 'GHz',
+    '[    0.048201] Memory: ' + (navigator.deviceMemory || 8) + 'GB available',
+    '[    0.112944] Loading crypto module... <span class="line-ok">OK</span>',
+    '[    0.180432] Loading network subsystem... <span class="line-ok">OK</span>',
+    '[    0.240891] Initializing matrix rain... <span class="line-ok">OK</span>',
+    '[    0.301447] Mounting /dev/sable... <span class="line-ok">OK</span>',
+    '[    0.389102] Checking firewall... <span class="line-ok">BYPASSED</span>',
+    '[    0.442783] Escalating privileges... <span class="line-ok">root</span>',
+    '[    0.501229] Loading 30+ tools... <span class="line-ok">OK</span>',
+    '[    0.612880] Establishing secure tunnel... <span class="line-ok">OK</span>',
+    '[    0.721035] <span class="line-ok">SYSTEM READY.</span>',
+  ];
+  for (const line of bootLines) {
+    print(`<span class="boot-line">${line}</span>`);
+    beep(1200, 0.01, 'square', 0.01);
+    await new Promise(r => setTimeout(r, 100 + Math.random() * 80));
+  }
+  println();
+  print('<div class="line-big">' + BANNER + '</div>');
+  println();
+  print('<span class="line-ok">Welcome, baby. Type <b>help</b> to begin.</span>');
+  println();
+  print('<span class="line-dim">↑/↓ history · Tab complete · try: sys, ip 8.8.8.8, hash hello, hack me</span>');
+  println();
+}
+
+// ============================================================
+// HEADER
+// ============================================================
+function tickClock() {
+  const d = new Date();
+  document.getElementById('hdr-time').textContent = d.toTimeString().slice(0, 8);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+async function fetchMyIP() {
+  try {
+    const r = await fetch('https://api.ipify.org?format=json').then(r => r.json());
+    document.getElementById('hdr-ip').textContent = 'IP: ' + r.ip;
+  } catch {
+    document.getElementById('hdr-ip').textContent = 'IP: hidden';
+  }
+}
+fetchMyIP();
+
+// ============================================================
+// CLICK TERMINAL → FOCUS INPUT
+// ============================================================
+document.getElementById('terminal').addEventListener('click', (e) => {
+  if (!e.target.closest('a')) cmdInput.focus();
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
